@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reproductor Inteligente</title>
+    <link rel="icon" type="image/webp" href="1774798592071.webp?v=2">
+    <link rel="shortcut icon" type="image/webp" href="1774798592071.webp?v=2">
+    <link rel="stylesheet" href="estilos.css">
+    
+    <!-- Librería para leer metadatos e imágenes incrustadas en los MP3 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsmediatags/3.9.5/jsmediatags.min.js"></script>
+
+    <style>
+        .folder-item {
+            cursor: pointer;
+            padding: 8px 12px;
+            background: #2a2a2a;
+            border-radius: 4px;
+            margin: 4px 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: background 0.2s;
+        }
+        .folder-item:hover {
+            background: #3a3a3a;
+        }
+        .folder-item .icon {
+            font-size: 20px;
+            width: 24px;
+            text-align: center;
+        }
+        .folder-item .name {
+            font-weight: bold;
+            flex: 1;
+        }
+        .folder-item .badge {
+            background: #1db954;
+            color: #fff;
+            border-radius: 12px;
+            padding: 0 10px;
+            font-size: 12px;
+            line-height: 20px;
+        }
+        .folder-content {
+            margin-left: 20px;
+            border-left: 2px solid #333;
+            padding-left: 12px;
+            display: none;
+        }
+        .folder-content.open {
+            display: block;
+        }
+        .track-item {
+            background: #282828;
+            padding: 10px 15px;
+            margin: 4px 0;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .track-item:hover {
+            background: #3a3a3a;
+        }
+        .track-item .play-icon {
+            color: #1db954;
+            font-size: 18px;
+        }
+        .empty-message {
+            color: #b3b3b3;
+            padding: 10px;
+            text-align: center;
+        }
+        #lista-canciones {
+            list-style: none;
+            padding: 0;
+            margin-top: 10px;
+        }
+        #lista-canciones > li {
+            list-style: none;
+        }
+
+        .player-wrapper {
+            background: rgba(255,255,255,0.04);
+            border-radius: 12px;
+            padding: 16px 20px 12px 20px;
+            margin-bottom: 24px;
+            border: 1px solid rgba(255,255,255,0.08);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.6);
+            transition: border-color 0.3s;
+        }
+        .player-wrapper:hover {
+            border-color: #1db954;
+        }
+
+        .player-content {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            margin-bottom: 12px;
+        }
+
+        /* Portada en background-image con protección anti-descarga */
+        .player-cover {
+            width: 80px;
+            height: 80px;
+            border-radius: 8px;
+            border: 2px solid rgba(255,255,255,0.1);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            background-color: #1a1a1a;
+            background-image: url('portada.png');
+            background-size: cover;
+            background-position: center;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-user-drag: none;
+            pointer-events: none;
+            flex-shrink: 0;
+        }
+
+        .player-info {
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+            position: relative;
+        }
+
+        #track-actual {
+            font-size: 1.2rem;
+            margin: 0;
+            letter-spacing: 0.3px;
+            font-weight: 500;
+            color: #1db954;
+            text-shadow: 0 0 20px rgba(29,185,84,0.1);
+            white-space: nowrap;
+            display: inline-block;
+        }
+
+        /* Animación de texto deslizante */
+        .marquee-animado {
+            animation: deslizarTexto 10s ease-in-out infinite alternate;
+        }
+
+        @keyframes deslizarTexto {
+            0%, 20% {
+                transform: translateX(0%);
+            }
+            80%, 100% {
+                transform: translateX(var(--desplazamiento-max, -50%));
+            }
+        }
+
+        .player-wrapper audio {
+            width: 100%;
+            display: block;
+            outline: none;
+            color-scheme: dark;
+        }
+
+        .player-wrapper audio::-webkit-media-controls-panel {
+            background-color: #1e1e1e !important;
+            border-radius: 8px;
+            box-shadow: inset 0 1px 2px rgba(0,0,0,0.8);
+        }
+        .player-wrapper audio::-webkit-media-controls-play-button {
+            background-color: #1db954;
+            border-radius: 50%;
+            color: #fff;
+            filter: drop-shadow(0 0 4px rgba(29,185,84,0.3));
+        }
+        .player-wrapper audio::-webkit-media-controls-play-button:hover {
+            background-color: #1ed760;
+            transform: scale(1.05);
+        }
+        .player-wrapper audio::-webkit-media-controls-timeline {
+            background-color: #333;
+            border-radius: 4px;
+            height: 4px;
+            margin: 0 8px;
+        }
+        .player-wrapper audio::-webkit-media-controls-current-time-display,
+        .player-wrapper audio::-webkit-media-controls-time-remaining-display {
+            color: #b3b3b3;
+            font-weight: 500;
+            font-size: 13px;
+        }
+        .player-wrapper audio::-webkit-media-controls-mute-button {
+            filter: brightness(0.8);
+        }
+        .player-wrapper audio::-webkit-media-controls-volume-slider {
+            background-color: #333;
+            border-radius: 4px;
+            height: 4px;
+        }
+        .player-wrapper audio::-webkit-media-controls-enclosure {
+            background-color: #1e1e1e !important;
+            border-radius: 8px;
+            padding: 4px 0;
+        }
+
+        .card {
+            padding: 30px 30px 40px 30px;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <nav>
+            <a href="index.html">Inicio</a>
+            <a href="reproductor.html" class="active">Reproductor</a>
+            <a href="acerca.html">Acerca de</a>
+        </nav>
+    </header>
+
+    <main>
+        <div class="card">
+            <h2>Mi Biblioteca Musical</h2>
+            <p style="color: #b3b3b3;">Haz clic en una carpeta para explorar su contenido</p>
+
+            <div class="player-wrapper">
+                <div class="player-content">
+                    <div id="player-cover-img" class="player-cover" oncontextmenu="return false;"></div>
+                    <div class="player-info">
+                        <h3 id="track-actual">Ningún track seleccionado</h3>
+                    </div>
+                </div>
+                <audio id="audio-player" controls controlsList="nodownload noremoteplayback" disableRemotePlayback></audio>
+            </div>
+
+            <ul class="track-list" id="lista-canciones">
+                <li class="track-item">Cargando biblioteca...</li>
+            </ul>
+        </div>
+    </main>
+
+    <script>
+        const reproductor = document.getElementById('audio-player');
+        const etiquetaTitulo = document.getElementById('track-actual');
+        const portadaDiv = document.getElementById('player-cover-img');
+        const jsMediaTags = window.jsmediatags;
+
+        function corregirRuta(ruta) {
+            ruta = ruta.replace(/\\/g, '/');
+            if (ruta.startsWith('..')) {
+                ruta = ruta.replace(/^\.\.\/?/, '');
+                if (!ruta.startsWith('Musica/') && !ruta.startsWith('Música/')) {
+                    ruta = 'Musica/' + ruta;
+                }
+            }
+            return ruta;
+        }
+
+        function construirArbol(canciones) {
+            const arbol = {};
+
+            canciones.forEach(cancion => {
+                let ruta = corregirRuta(cancion.archivo);
+                const partes = ruta.split('/');
+                let nodoActual = arbol;
+
+                for (let i = 0; i < partes.length - 1; i++) {
+                    const carpeta = partes[i];
+                    if (carpeta === '') continue;
+                    if (!nodoActual[carpeta]) {
+                        nodoActual[carpeta] = {};
+                    }
+                    nodoActual = nodoActual[carpeta];
+                }
+
+                cancion.archivoCorregido = ruta;
+                if (!nodoActual.__archivos__) {
+                    nodoActual.__archivos__ = [];
+                }
+                nodoActual.__archivos__.push(cancion);
+            });
+
+            return arbol;
+        }
+
+        // 🔥 Control de título dinámico deslizante
+        function actualizarTitulo(nuevoTitulo) {
+            etiquetaTitulo.classList.remove('marquee-animado');
+            etiquetaTitulo.textContent = nuevoTitulo;
+            etiquetaTitulo.style.removeProperty('--desplazamiento-max');
+
+            setTimeout(() => {
+                const anchoContenedor = etiquetaTitulo.parentElement.clientWidth;
+                const anchoTexto = etiquetaTitulo.scrollWidth;
+
+                if (anchoTexto > anchoContenedor) {
+                    const diferencia = anchoTexto - anchoContenedor;
+                    etiquetaTitulo.style.setProperty('--desplazamiento-max', `-${diferencia + 15}px`);
+                    etiquetaTitulo.classList.add('marquee-animado');
+                }
+            }, 50);
+        }
+
+        // Carga de la imagen de metadatos como background-image
+        function cargarPortadaMetadatos(rutaCancion) {
+            portadaDiv.style.backgroundImage = "url('portada.png')";
+
+            jsMediaTags.read(location.origin + '/' + rutaCancion, {
+                onSuccess: function(tag) {
+                    const picture = tag.tags.picture;
+                    if (picture) {
+                        let base64String = "";
+                        for (let i = 0; i < picture.data.length; i++) {
+                            base64String += String.fromCharCode(picture.data[i]);
+                        }
+                        const base64 = "data:" + picture.format + ";base64," + window.btoa(base64String);
+                        portadaDiv.style.backgroundImage = `url('${base64}')`;
+                    } else {
+                        portadaDiv.style.backgroundImage = "url('portada.png')";
+                    }
+                },
+                onError: function(error) {
+                    console.log('No se pudieron leer los metadatos de la imagen:', error);
+                    portadaDiv.style.backgroundImage = "url('portada.png')";
+                }
+            });
+        }
+
+        function renderizarArbol(nodo) {
+            const ul = document.createElement('ul');
+            ul.style.listStyle = 'none';
+            ul.style.padding = '0';
+
+            const keys = Object.keys(nodo).filter(key => key !== '__archivos__');
+            keys.sort();
+
+            keys.forEach(carpeta => {
+                const li = document.createElement('li');
+                li.style.margin = '4px 0';
+
+                const folderDiv = document.createElement('div');
+                folderDiv.className = 'folder-item';
+
+                const iconSpan = document.createElement('span');
+                iconSpan.className = 'icon';
+                iconSpan.textContent = '📁';
+                folderDiv.appendChild(iconSpan);
+
+                const nameSpan = document.createElement('span');
+                nameSpan.className = 'name';
+                nameSpan.textContent = carpeta;
+                folderDiv.appendChild(nameSpan);
+
+                const subNodo = nodo[carpeta];
+                const archivos = subNodo.__archivos__ || [];
+                const subCarpetas = Object.keys(subNodo).filter(k => k !== '__archivos__');
+                const totalItems = archivos.length + subCarpetas.length;
+                if (totalItems > 0) {
+                    const badge = document.createElement('span');
+                    badge.className = 'badge';
+                    badge.textContent = totalItems;
+                    folderDiv.appendChild(badge);
+                }
+
+                let contentDiv = null;
+                folderDiv.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    if (!contentDiv) {
+                        contentDiv = document.createElement('div');
+                        contentDiv.className = 'folder-content';
+                        const subUl = renderizarArbol(subNodo);
+                        contentDiv.appendChild(subUl);
+                        li.appendChild(contentDiv);
+                    }
+                    contentDiv.classList.toggle('open');
+                    iconSpan.textContent = contentDiv.classList.contains('open') ? '📂' : '📁';
+                });
+
+                li.appendChild(folderDiv);
+                ul.appendChild(li);
+            });
+
+            if (nodo.__archivos__ && nodo.__archivos__.length > 0) {
+                const archivos = nodo.__archivos__;
+                archivos.forEach(cancion => {
+                    const li = document.createElement('li');
+                    li.className = 'track-item';
+                    li.innerHTML = `
+                        <span>${cancion.titulo || 'Sin título'}</span>
+                        <span class="play-icon">▶</span>
+                    `;
+                    li.addEventListener('click', function() {
+                        const rutaFinal = cancion.archivoCorregido;
+                        console.log('▶ Reproduciendo:', rutaFinal);
+                        reproductor.src = rutaFinal;
+                        
+                        // Actualizar título dinámico con marquesina
+                        actualizarTitulo(cancion.titulo || 'Sin título');
+                        
+                        // Extraer portada
+                        cargarPortadaMetadatos(rutaFinal);
+
+                        reproductor.play();
+                    });
+                    ul.appendChild(li);
+                });
+            }
+
+            return ul;
+        }
+
+        async function cargarMusica() {
+            const listaUI = document.getElementById('lista-canciones');
+
+            try {
+                const respuesta = await fetch('MusicList.ashx');
+                if (!respuesta.ok) {
+                    throw new Error(`HTTP ${respuesta.status}`);
+                }
+                const canciones = await respuesta.json();
+
+                if (!Array.isArray(canciones) || canciones.length === 0) {
+                    listaUI.innerHTML = '<li class="empty-message">No se encontraron canciones.</li>';
+                    return;
+                }
+
+                const arbol = construirArbol(canciones);
+                const fragment = renderizarArbol(arbol);
+                listaUI.innerHTML = '';
+                listaUI.appendChild(fragment);
+
+            } catch (error) {
+                console.error('Error:', error);
+                listaUI.innerHTML = `<li class="track-item" style="color:red;">Error: ${error.message}</li>`;
+            }
+        }
+
+        cargarMusica();
+    </script>
+</body>
+</html>

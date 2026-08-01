@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi Servidor de Música</title>
+    <style>
+        :root {
+            --bg: #121212;
+            --card: #1e1e1e;
+            --accent: #1db954; /* Verde Spotify */
+            --text: #ffffff;
+        }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; display: flex; justify-content: center; }
+        .container { background: var(--card); width: 100%; max-width: 600px; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        h1, h2 { color: var(--accent); margin-top: 0; }
+        .back-btn { display: inline-block; color: #b3b3b3; text-decoration: none; margin-bottom: 15px; font-size: 14px; }
+        .back-btn:hover { color: var(--accent); }
+        
+        /* Lista de Carpetas o Canciones */
+        .list { list-style: none; padding: 0; margin: 20px 0; }
+        .item { background: #282828; padding: 15px; margin-bottom: 8px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; transition: 0.2s; }
+        .item:hover { background: #383838; }
+        .item a { color: var(--text); text-decoration: none; font-weight: bold; width: 100%; display: block; }
+        
+        /* Estilos del Reproductor */
+        .player-box { background: #111; padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center; }
+        audio { width: 100%; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <a href="index.html" id="btn-volver" class="back-btn" style="display: none;">← Volver a los Géneros</a>
+        
+        <h1 id="titulo-pagina">Mis Carpetas de Música</h1>
+        <p id="subtitulo" style="color: #b3b3b3;">Selecciona una carpeta para explorar tus tracks:</p>
+
+        <div class="player-box" id="player-container" style="display: none;">
+            <span style="font-size: 12px; color: var(--accent);">REPRODUCIENDO ACUALMENTE:</span>
+            <div id="now-playing" style="font-weight: bold; margin-top: 5px;">Ninguno</div>
+            <audio id="audio-player" controls></audio>
+        </div>
+
+        <ul class="list" id="contenido-lista"></ul>
+    </div>
+
+    <script src="lista.js"></script>
+    <script>
+        // 1. Detectar si el usuario pidió una carpeta específica en la URL (Ej: index.html?genero=Tech House)
+        const parametros = new URLSearchParams(window.location.search);
+        const generoSeleccionado = parametros.get('genero');
+
+        const listaUI = document.getElementById('contenido-lista');
+        const tituloPagina = document.getElementById('titulo-pagina');
+        const subtitulo = document.getElementById('subtitulo');
+        const btnVolver = document.getElementById('btn-volver');
+        const playerContainer = document.getElementById('player-container');
+        const audioPlayer = document.getElementById('audio-player');
+        const nowPlaying = document.getElementById('now-playing');
+
+        if (!generoSeleccionado) {
+            // --- MODO MENÚ: Mostrar las carpetas únicas disponibles ---
+            tituloPagina.innerText = "Mis Carpetas de Música";
+            
+            // Obtener carpetas únicas de la lista de tracks
+            const carpetasUnicas = [...new Set(miBiblioteca.map(track => track.carpeta))];
+
+            carpetasUnicas.forEach(carpeta => {
+                const li = document.createElement('li');
+                li.className = 'item';
+                li.innerHTML = `<a href="index.html?genero=${encodeURIComponent(carpeta)}">📁 ${carpeta}</a>`;
+                listaUI.appendChild(li);
+            });
+
+        } else {
+            // --- MODO CARPETA: Filtrar y mostrar solo los .mp3/.wav de esta carpeta ---
+            btnVolver.style.display = "inline-block";
+            tituloPagina.innerText = `Carpeta: ${generoSeleccionado}`;
+            subtitulo.innerText = "Haz clic en un track para escucharlo por streaming:";
+
+            // Filtrar tracks que pertenezcan a la carpeta seleccionada
+            const tracksFiltrados = miBiblioteca.filter(track => track.carpeta === generoSeleccionado);
+
+            if (tracksFiltrados.length === 0) {
+                listaUI.innerHTML = `<li class="item" style="color: #b3b3b3;">No hay archivos registrados en esta carpeta todavía.</li>`;
+            }
+
+            tracksFiltrados.forEach(track => {
+                const li = document.createElement('li');
+                li.className = 'item';
+                li.style.cursor = 'pointer';
+                li.innerHTML = `
+                    <div>
+                        <strong>🎵 ${track.titulo}</strong><br>
+                        <small style="color: #b3b3b3;">${track.archivo.endsWith('.wav') ? 'WAV Audio' : 'MP3 Audio'}</small>
+                    </div>
+                    <span style="color: var(--accent);">▶</span>
+                `;
+
+                // Configurar acción al hacer clic en la canción
+                li.onclick = () => {
+                    playerContainer.style.display = "block";
+                    nowPlaying.innerText = track.titulo;
+                    
+                    // Si está en la raíz usa el archivo directo, si no, añade el nombre de la carpeta
+                    if (track.carpeta === "Raiz") {
+                        audioPlayer.src = track.archivo;
+                    } else {
+                        audioPlayer.src = track.carpeta + "/" + track.archivo;
+                    }
+                    
+                    audioPlayer.play();
+                };
+
+                listaUI.appendChild(li);
+            });
+        }
+    </script>
+</body>
+</html>
