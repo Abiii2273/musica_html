@@ -282,7 +282,7 @@
             return arbol;
         }
 
-        // 🔥 Control de título dinámico deslizante
+        // Control de título dinámico deslizante
         function actualizarTitulo(nuevoTitulo) {
             etiquetaTitulo.classList.remove('marquee-animado');
             etiquetaTitulo.textContent = nuevoTitulo;
@@ -412,7 +412,8 @@
             const listaUI = document.getElementById('lista-canciones');
 
             try {
-                const respuesta = await fetch('MusicList.ashx');
+                // Endpoint optimizado para Vercel Serverless Functions
+                const respuesta = await fetch('/api/music-list');
                 if (!respuesta.ok) {
                     throw new Error(`HTTP ${respuesta.status}`);
                 }
